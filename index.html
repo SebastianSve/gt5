@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>Mini-GTA 🚓</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #2c3e50;
+  }
+  canvas {
+    display: block;
+    background: #87ceeb; /* Himmel */
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="1000" height="600"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// ------------------ SPILLER ------------------
+let player = {
+  x: 500,
+  y: 300,
+  width: 40,
+  height: 60,
+  color: "green",
+  speed: 5,
+  lives: 3,
+  score: 0,
+};
+
+// ------------------ FIENDER / POLITI ------------------
+let policeCars = [
+  {x: 100, y: 100, width: 40, height: 60, speed: 2},
+  {x: 900, y: 500, width: 40, height: 60, speed: 2}
+];
+
+// ------------------ ANDRE BILER ------------------
+let cars = [
+  {x: 200, y: 400, width: 40, height: 60, speed: 1, color: "blue"},
+  {x: 700, y: 150, width: 40, height: 60, speed: 1.5, color: "orange"}
+];
+
+// ------------------ PICKUPS ------------------
+let pickups = [
+  {x: 150, y: 150, width: 20, height: 20, type: "coin"},
+  {x: 850, y: 450, width: 20, height: 20, type: "coin"}
+];
+
+// ------------------ SKUDD ------------------
+let bullets = [];
+
+// ------------------ INPUT ------------------
+let keys = {};
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup", e => keys[e.key] = false);
+
+// ------------------ SPILLLOOP ------------------
+function gameLoop() {
+  // ---- Flytt spiller ----
+  if(keys["ArrowUp"] || keys["w"]) player.y -= player.speed;
+  if(keys["ArrowDown"] || keys["s"]) player.y += player.speed;
+  if(keys["ArrowLeft"] || keys["a"]) player.x -= player.speed;
+  if(keys["ArrowRight"] || keys["d"]) player.x += player.speed;
+
+  // ---- Hold spiller innenfor canvas ----
+  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+  player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+
+  // ---- Flytt politi mot spiller ----
+  policeCars.forEach(police => {
+    let dx = player.x - police.x;
+    let dy = player.y - police.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    if(dist > 0){
+      police.x += (dx / dist) * police.speed;
+      police.y += (dy / dist) * police.speed;
+    }
+  });
+
+  // ---- Flytt andre biler ----
+  cars.forEach(car => {
+    car.x += car.speed;
+    if(car.x > canvas.width || car.x < 0) car.speed *= -1;
+  });
+
+  // ---- Skudd ----
+  bullets.forEach((b, i) => {
+    b.y -= b.speed;
+    // Sjekk kollisjon med politi
+    policeCars.forEach((police, j) => {
+      if(b.x < police.x + police.width && b.x + b.width > police.x &&
+         b.y < police.y + police.height && b.y + b.height > police.y) {
+        policeCars.splice(j, 1);
+        bullets.splice(i, 1);
+        player.score += 10;
+      }
+    });
+    if(b.y < 0) bullets.splice(i, 1);
+  });
+
+  // ---- Sjekk pickups ----
+  pickups.forEach((p, i) => {
+    if(player.x < p.x + p.width && player.x + player.width > p.x &&
+       player.y < p.y + p.height && player.y + player.height > p.y) {
+      pickups.splice(i, 1);
+      player.score += 5;
+    }
+  });
+
+  // ---- Sjekk kollisjon med politi ----
+  policeCars.forEach(police => {
+    if(player.x < police.x + police.width && player.x + player.width > police.x &&
+       player.y < police.y + police.height && player.y + player.height > police.y) {
+      player.lives -= 1;
+      player.x = 500;
+      player.y = 300;
+    }
+  });
+
+  // ---- Sjekk kollisjon med biler ----
+  cars.forEach(car => {
+    if(player.x < car.x + car.width && player.x + player.width > car.x &&
+       player.y < car.y + car.height && player.y + player.height > car.y) {
+      player.lives -= 1;
+      player.x = 500;
+      player.y = 300;
+    }
+  });
+
+  // ---- Tegn alt ----
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Spilleren
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+
+  // Politi
+  policeCars.forEach(police => {
+    ctx.fillStyle = "red";
+    ctx.fillRect(police.x, police.y, police.width, police.height);
+  });
+
+  // Andre biler
+  cars.forEach(car => {
+    ctx.fillStyle = car.color;
+    ctx.fillRect(car.x, car.y, car.width, car.height);
+  });
+
+  // Pickups
+  pickups.forEach(p => {
+    ctx.fillStyle = "yellow";
+    ctx.fillRect(p.x, p.y, p.width, p.height);
+  });
+
+  // Skudd
+  bullets.forEach(b => {
+    ctx.fillStyle = "black";
+    ctx.fillRect(b.x, b.y, b.width, b.height);
+  });
+
+  // HUD
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText(`Lives: ${player.lives} ❤️`, 10, 20);
+  ctx.fillText(`Score: ${player.score} 💰`, 10, 50);
+
+  // Game over
+  if(player.lives <= 0) {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = "red";
+    ctx.font = "50px Arial";
+    ctx.fillText("GAME OVER", canvas.width/2 - 150, canvas.height/2);
+    return;
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ---- Skyt med space ----
+window.addEventListener("keydown", e => {
+  if(e.key === " ") {
+    bullets.push({x: player.x + player.width/2 - 5, y: player.y, width:10, height:20, speed:10});
+  }
+});
+
+gameLoop();
+</script>
+</body>
+</html>
